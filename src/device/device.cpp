@@ -461,7 +461,7 @@ bool Device::connectDevice()
             params.audioCodec = "aac";
         }
         params.audioSource = m_params.recordAudioSource.trimmed().toLower();
-        if (params.audioSource != "output") {
+        if (params.audioSource != "output" && params.audioSource != "playback") {
             params.audioSource = "output";
         }
         params.scid = m_params.scid;
