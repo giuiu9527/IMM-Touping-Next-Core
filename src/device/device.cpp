@@ -101,6 +101,9 @@ Device::Device(DeviceParams params, QObject *parent) : IDevice(parent), m_params
             absFilePath = dir.absoluteFilePath(fileName);
         }
         m_recorder = new Recorder(absFilePath, this);
+        m_recorder->setFormat(m_params.recordFileFormat.compare("mkv", Qt::CaseInsensitive) == 0
+                                  ? Recorder::RECORDER_FORMAT_MKV
+                                  : Recorder::RECORDER_FORMAT_MP4);
     }
     initSignals();
 }
@@ -108,6 +111,10 @@ Device::Device(DeviceParams params, QObject *parent) : IDevice(parent), m_params
 Device::~Device()
 {
     Device::disconnectDevice();
+    QMutexLocker locker(&m_recorderMutex);
+    if (m_lastConfigPacket) {
+        av_packet_free(&m_lastConfigPacket);
+    }
 }
 
 void Device::setUserData(void *data)
@@ -352,11 +359,13 @@ void Device::initSignals()
                 qCritical("Could not send packet to decoder");
             }
 
+            QMutexLocker locker(&m_recorderMutex);
             if (m_recorder && !m_recorder->push(packet)) {
                 qCritical("Could not send packet to recorder");
             }
         }, Qt::DirectConnection);
         connect(m_stream, &Demuxer::getConfigFrame, this, [this](AVPacket *packet) {
+            QMutexLocker locker(&m_recorderMutex);
             if (m_lastConfigPacket) av_packet_free(&m_lastConfigPacket);
             m_lastConfigPacket = av_packet_clone(packet);
             if (m_recorder && !m_recorder->push(packet)) {
@@ -455,6 +464,7 @@ void Device::disconnectDevice()
         m_decoder->close();
     }
 
+    QMutexLocker locker(&m_recorderMutex);
     if (m_recorder) {
         if (m_recorder->isRunning()) {
             m_recorder->stopRecorder();
@@ -471,6 +481,7 @@ void Device::disconnectDevice()
 
 bool Device::startRecording(const QString &fileName, const QString &format)
 {
+    QMutexLocker locker(&m_recorderMutex);
     if (fileName.isEmpty() || m_recorder || m_recordFrameSize.isEmpty() || !m_lastConfigPacket) return false;
     auto *recorder = new Recorder(fileName, this);
     recorder->setFrameSize(m_recordFrameSize);
@@ -482,6 +493,7 @@ bool Device::startRecording(const QString &fileName, const QString &format)
 
 void Device::stopRecording()
 {
+    QMutexLocker locker(&m_recorderMutex);
     if (!m_recorder) return;
     if (m_recorder->isRunning()) { m_recorder->stopRecorder(); m_recorder->wait(); }
     m_recorder->close();

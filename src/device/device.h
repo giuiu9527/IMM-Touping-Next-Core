@@ -3,6 +3,7 @@
 
 #include <set>
 #include <QElapsedTimer>
+#include <QMutex>
 #include <QPointer>
 #include <QTime>
 
@@ -98,6 +99,10 @@ private:
     QPointer<FileHandler> m_fileHandler;
     QPointer<Demuxer> m_stream;
     QPointer<Recorder> m_recorder;
+    // getFrame/getConfigFrame run in the demuxer thread, while the IMM UI/API
+    // starts and stops a recorder in the GUI thread.  Keep the hand-off
+    // serialized so a packet cannot be queued after stopRecorder().
+    QMutex m_recorderMutex;
     AVPacket* m_lastConfigPacket = Q_NULLPTR;
     QSize m_recordFrameSize;
 
