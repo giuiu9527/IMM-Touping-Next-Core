@@ -334,7 +334,7 @@ void Recorder::run()
             // finish the recording) before actually stopping
             if (m_stopped && m_queue.isEmpty()) {
                 AVPacket *last = m_previous;
-                if (last) {
+                if (last && m_videoStarted) {
                     last->pts -= ptsOrigin;
                     last->dts = last->pts;
                     // assign an arbitrary duration to the last packet
@@ -348,6 +348,9 @@ void Recorder::run()
                     }
                     packetDelete(last);
                 }
+                else if (last) {
+                    packetDelete(last);
+                }
                 break;
             }
 
@@ -356,6 +359,13 @@ void Recorder::run()
 
         // recorder->previous is only written from this thread, no need to lock
         if (rec->stream_index == 1) {
+            // Keep audio aligned with the first independently decodable video
+            // frame.  Audio received while waiting for an IDR belongs before
+            // the recording timeline and must not create a silent/frozen lead.
+            if (!m_videoStarted) {
+                packetDelete(rec);
+                continue;
+            }
             if (rec->pts != AV_NOPTS_VALUE) {
                 if (m_audioPtsOrigin == AV_NOPTS_VALUE) m_audioPtsOrigin = rec->pts;
                 rec->pts -= m_audioPtsOrigin; rec->dts = rec->pts;
@@ -379,8 +389,13 @@ void Recorder::run()
         }
 
         if (previous->pts != AV_NOPTS_VALUE) {
-            if (ptsOrigin == AV_NOPTS_VALUE) {
+            if (!m_videoStarted) {
+                if (!(previous->flags & AV_PKT_FLAG_KEY)) {
+                    packetDelete(previous);
+                    continue;
+                }
                 ptsOrigin = previous->pts;
+                m_videoStarted = true;
             }
             previous->pts -= ptsOrigin;
             previous->dts = previous->pts;

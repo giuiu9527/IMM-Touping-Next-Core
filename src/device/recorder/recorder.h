@@ -60,6 +60,10 @@ private:
     AVPacket *m_audioConfig = Q_NULLPTR;
     qint64 m_audioPtsOrigin = AV_NOPTS_VALUE;
     bool m_headerWritten = false;
+    // A dynamic recording can start between H.264 IDR frames.  Never write
+    // predicted frames before the first keyframe, or players show a frozen
+    // opening frame until the next IDR.
+    bool m_videoStarted = false;
     RecorderFormat m_format = RECORDER_FORMAT_NULL;
     QMutex m_mutex;
     QWaitCondition m_recvDataCond;
