@@ -173,9 +173,11 @@ target_include_directories(${QSC_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DI
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     # ffmpeg
     # include
-    target_include_directories(${QSC_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/ffmpeg/include)
+    # The legacy FFmpeg 4 bundle has no Matroska muxer.  Use the vendored
+    # LGPL shared build so MP4 and MKV are both real recording containers.
+    target_include_directories(${QSC_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/ffmpeg-mkv/include)
     # link
-    set(FFMPEG_LIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/ffmpeg/lib/${QSC_CPU_ARCH}")
+    set(FFMPEG_LIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/ffmpeg-mkv/lib")
     target_link_directories(${QSC_PROJECT_NAME} PUBLIC ${FFMPEG_LIB_PATH})
     target_link_libraries(${QSC_PROJECT_NAME} PRIVATE
         avformat
@@ -185,13 +187,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     )
     # copy
     set(THIRD_PARTY_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/third_party")
-    set(FFMPEG_BIN_PATH "${THIRD_PARTY_PATH}/ffmpeg/bin/${QSC_CPU_ARCH}")
+    set(FFMPEG_BIN_PATH "${THIRD_PARTY_PATH}/ffmpeg-mkv/bin/${QSC_CPU_ARCH}")
     add_custom_command(TARGET ${QSC_PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FFMPEG_BIN_PATH}/avcodec-58.dll" "${QSC_DEPLOY_PATH}"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FFMPEG_BIN_PATH}/avformat-58.dll" "${QSC_DEPLOY_PATH}"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FFMPEG_BIN_PATH}/avutil-56.dll" "${QSC_DEPLOY_PATH}"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FFMPEG_BIN_PATH}/swscale-5.dll" "${QSC_DEPLOY_PATH}"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FFMPEG_BIN_PATH}/swresample-3.dll" "${QSC_DEPLOY_PATH}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FFMPEG_BIN_PATH}/avcodec-63.dll" "${QSC_DEPLOY_PATH}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FFMPEG_BIN_PATH}/avformat-63.dll" "${QSC_DEPLOY_PATH}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FFMPEG_BIN_PATH}/avutil-61.dll" "${QSC_DEPLOY_PATH}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FFMPEG_BIN_PATH}/swscale-10.dll" "${QSC_DEPLOY_PATH}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${FFMPEG_BIN_PATH}/swresample-7.dll" "${QSC_DEPLOY_PATH}"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${THIRD_PARTY_PATH}/adb/win/adb.exe" "${QSC_DEPLOY_PATH}"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${THIRD_PARTY_PATH}/adb/win/AdbWinApi.dll" "${QSC_DEPLOY_PATH}"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${THIRD_PARTY_PATH}/adb/win/AdbWinUsbApi.dll" "${QSC_DEPLOY_PATH}"

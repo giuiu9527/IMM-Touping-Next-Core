@@ -51,9 +51,8 @@ void Decoder::close()
     if (!m_codecCtx) {
         return;
     }
-    if (m_isCodecCtxOpen) {
-        avcodec_close(m_codecCtx);
-    }
+    // avcodec_free_context() closes a context on modern FFmpeg.  avcodec_close
+    // was removed in FFmpeg 5, so do not call it separately.
     avcodec_free_context(&m_codecCtx);
 }
 

@@ -151,8 +151,12 @@ bool Recorder::open()
         audioStream->codecpar->codec_type = AVMEDIA_TYPE_AUDIO;
         audioStream->codecpar->codec_id = m_audioCodec;
         audioStream->codecpar->sample_rate = sampleRate;
+#if LIBAVCODEC_VERSION_MAJOR >= 61
+        av_channel_layout_default(&audioStream->codecpar->ch_layout, channels);
+#else
         audioStream->codecpar->channels = channels;
         audioStream->codecpar->channel_layout = av_get_default_channel_layout(channels);
+#endif
         audioStream->codecpar->format = AV_SAMPLE_FMT_FLTP;
         if (m_audioConfig) {
             audioStream->codecpar->extradata = (quint8 *)av_mallocz(m_audioConfig->size + AV_INPUT_BUFFER_PADDING_SIZE);
