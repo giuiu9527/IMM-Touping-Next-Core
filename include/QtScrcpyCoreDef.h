@@ -58,6 +58,9 @@ struct DeviceParams {
     QString startApp = "";            // 建连后交由 control 协议发送
 
     QString recordPath = "";          // 视频保存路径
+    // Optional absolute destination.  When supplied, the caller owns naming
+    // (used by IMM's phone-triggered recording API).
+    QString recordFilePath = "";
     QString recordFileFormat = "mp4"; // 视频保存格式 mp4/mkv
     bool recordFile = false;          // 录制到文件
 

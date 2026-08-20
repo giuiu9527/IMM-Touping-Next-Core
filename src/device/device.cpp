@@ -83,9 +83,9 @@ Device::Device(DeviceParams params, QObject *parent) : IDevice(parent), m_params
 
     m_server = new Server(this);
     if (m_params.recordFile && !m_params.recordPath.trimmed().isEmpty()) {
-        QString absFilePath;
+        QString absFilePath = m_params.recordFilePath;
         QString fileDir(m_params.recordPath);
-        if (!fileDir.isEmpty()) {
+        if (absFilePath.isEmpty() && !fileDir.isEmpty()) {
             QDateTime dateTime = QDateTime::currentDateTime();
             QString fileName = dateTime.toString("_yyyyMMdd_hhmmss_zzz");
             fileName = m_params.serial + fileName;
