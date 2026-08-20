@@ -224,11 +224,10 @@ void Device::cameraZoomOut()
 
 bool Device::isReversePort(quint16 port)
 {
-    if (m_server && m_server->isReverse() && port == m_server->getParams().localPort) {
-        return true;
-    }
-
-    return false;
+    // DeviceManage allocates all ports before the asynchronous server startup
+    // begins.  Checking Server::isReverse() here races that startup and lets
+    // several newly-created devices all claim the same port.
+    return m_params.useReverse && port == m_params.localPort;
 }
 
 void Device::initSignals()
