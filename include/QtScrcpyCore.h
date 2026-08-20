@@ -133,6 +133,8 @@ public:
     virtual void clipboardPaste() = 0;
     virtual void pushFileRequest(const QString &file, const QString &devicePath = "") = 0;
     virtual void installApkRequest(const QString &apkFile) = 0;
+    virtual bool startRecording(const QString &fileName, const QString &format = "mp4") { Q_UNUSED(fileName); Q_UNUSED(format); return false; }
+    virtual void stopRecording() {}
 
     virtual void screenshot() = 0;
     virtual void showTouch(bool show) = 0;

@@ -260,6 +260,7 @@ void Device::initSignals()
             m_serverStartSuccess = success;
             emit deviceConnected(success, m_params.serial, deviceName, size);
             if (success) {
+                m_recordFrameSize = size;
                 double diff = m_startTimeCount.elapsed() / 1000.0;
                 qInfo() << QString("server start finish in %1s").arg(diff).toStdString().c_str();
 
@@ -356,6 +357,8 @@ void Device::initSignals()
             }
         }, Qt::DirectConnection);
         connect(m_stream, &Demuxer::getConfigFrame, this, [this](AVPacket *packet) {
+            if (m_lastConfigPacket) av_packet_free(&m_lastConfigPacket);
+            m_lastConfigPacket = av_packet_clone(packet);
             if (m_recorder && !m_recorder->push(packet)) {
                 qCritical("Could not send config packet to recorder");
             }
@@ -464,6 +467,26 @@ void Device::disconnectDevice()
         emit deviceDisconnected(m_params.serial);
     }
     m_serverStartSuccess = false;
+}
+
+bool Device::startRecording(const QString &fileName, const QString &format)
+{
+    if (fileName.isEmpty() || m_recorder || m_recordFrameSize.isEmpty() || !m_lastConfigPacket) return false;
+    auto *recorder = new Recorder(fileName, this);
+    recorder->setFrameSize(m_recordFrameSize);
+    recorder->setFormat(format.toLower() == "mkv" ? Recorder::RECORDER_FORMAT_MKV : Recorder::RECORDER_FORMAT_MP4);
+    if (!recorder->open() || !recorder->startRecorder()) { recorder->close(); recorder->deleteLater(); return false; }
+    m_recorder = recorder;
+    return m_recorder->push(m_lastConfigPacket);
+}
+
+void Device::stopRecording()
+{
+    if (!m_recorder) return;
+    if (m_recorder->isRunning()) { m_recorder->stopRecorder(); m_recorder->wait(); }
+    m_recorder->close();
+    m_recorder->deleteLater();
+    m_recorder = Q_NULLPTR;
 }
 
 void Device::postGoBack()

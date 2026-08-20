@@ -20,6 +20,7 @@ class Demuxer;
 class VideoForm;
 class Controller;
 struct AVFrame;
+struct AVPacket;
 
 namespace qsc {
 
@@ -67,6 +68,8 @@ public:
     void clipboardPaste() override;
     void pushFileRequest(const QString &file, const QString &devicePath = "") override;
     void installApkRequest(const QString &apkFile) override;
+    bool startRecording(const QString &fileName, const QString &format = "mp4") override;
+    void stopRecording() override;
 
     void screenshot() override;
     void showTouch(bool show) override;
@@ -95,6 +98,8 @@ private:
     QPointer<FileHandler> m_fileHandler;
     QPointer<Demuxer> m_stream;
     QPointer<Recorder> m_recorder;
+    AVPacket* m_lastConfigPacket = Q_NULLPTR;
+    QSize m_recordFrameSize;
 
     QElapsedTimer m_startTimeCount;
     DeviceParams m_params;
