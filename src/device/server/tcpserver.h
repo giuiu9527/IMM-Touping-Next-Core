@@ -9,12 +9,14 @@ class TcpServer : public QTcpServer
 public:
     explicit TcpServer(QObject *parent = nullptr);
     virtual ~TcpServer();
+    void setAudioEnabled(bool enabled);
 
 protected:
     virtual void incomingConnection(qintptr handle);
 
 private:
-    bool m_isVideoSocket = true;
+    bool m_audioEnabled = false;
+    int m_nextSocket = 0;
 };
 
 #endif // TCPSERVER_H

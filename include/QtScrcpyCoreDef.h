@@ -63,6 +63,9 @@ struct DeviceParams {
     QString recordFilePath = "";
     QString recordFileFormat = "mp4"; // 视频保存格式 mp4/mkv
     bool recordFile = false;          // 录制到文件
+    bool recordAudio = false;         // 是否建立 scrcpy 音频 socket
+    QString recordAudioCodec = "aac";
+    QString recordAudioSource = "output";
 
     QString pushFilePath = "/sdcard/"; // 推送到安卓设备的文件保存路径（必须以/结尾）
 

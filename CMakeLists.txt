@@ -120,6 +120,8 @@ set(QSC_DEVICE_SOURCES
     src/device/server/videosocket.cpp
     src/device/demuxer/demuxer.h
     src/device/demuxer/demuxer.cpp
+    src/device/demuxer/audiodemuxer.h
+    src/device/demuxer/audiodemuxer.cpp
 )
 source_group(src/device FILES ${QSC_DEVICE_SOURCES})
 

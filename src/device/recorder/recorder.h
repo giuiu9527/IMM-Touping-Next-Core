@@ -28,12 +28,14 @@ public:
 
     void setFrameSize(const QSize &declaredFrameSize);
     void setFormat(Recorder::RecorderFormat format);
+    void setAudio(AVCodecID codec, const AVPacket *config);
     bool open();
     void close();
     bool write(AVPacket *packet);
     bool startRecorder();
     void stopRecorder();
     bool push(const AVPacket *packet);
+    bool pushAudio(const AVPacket *packet);
 
 private:
     const AVOutputFormat *findMuxer(const char *name);
@@ -54,6 +56,9 @@ private:
     QString m_fileName = "";
     AVFormatContext *m_formatCtx = Q_NULLPTR;
     QSize m_declaredFrameSize;
+    AVCodecID m_audioCodec = AV_CODEC_ID_NONE;
+    AVPacket *m_audioConfig = Q_NULLPTR;
+    qint64 m_audioPtsOrigin = AV_NOPTS_VALUE;
     bool m_headerWritten = false;
     RecorderFormat m_format = RECORDER_FORMAT_NULL;
     QMutex m_mutex;

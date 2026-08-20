@@ -26,12 +26,14 @@ Server::Server(QObject *parent) : QObject(parent)
 
     connect(&m_serverSocket, &QTcpServer::newConnection, this, [this]() {
         QTcpSocket *tmp = m_serverSocket.nextPendingConnection();
-        if (dynamic_cast<VideoSocket *>(tmp)) {
-            m_videoSocket = dynamic_cast<VideoSocket *>(tmp);
+        if (dynamic_cast<VideoSocket *>(tmp) && !m_videoSocket) {
+            m_videoSocket = static_cast<VideoSocket *>(tmp);
             if (!m_videoSocket->isValid() || !readInfo(m_videoSocket, m_deviceName, m_deviceSize)) {
                 stop();
                 emit serverStarted(false);
             }
+        } else if (dynamic_cast<VideoSocket *>(tmp) && m_params.audio && !m_audioSocket) {
+            m_audioSocket = static_cast<VideoSocket *>(tmp);
         } else {
             m_controlSocket = tmp;
             if (m_controlSocket && m_controlSocket->isValid()) {
@@ -217,7 +219,11 @@ bool Server::execute()
     if (!m_params.codecName.isEmpty()) {
         args << QString("video_encoder=%1").arg(m_params.codecName);
     }
-    args << "audio=false";
+    args << QString("audio=%1").arg(m_params.audio ? "true" : "false");
+    if (m_params.audio) {
+        args << QString("audio_codec=%1").arg(m_params.audioCodec);
+        args << QString("audio_source=%1").arg(m_params.audioSource);
+    }
     // 服务端默认-1，可不传
     if (-1 != m_params.scid) {
         args << QString("scid=%1").arg(m_params.scid, 8, 16, QChar('0'));
@@ -307,6 +313,13 @@ VideoSocket* Server::removeVideoSocket()
     return socket;
 }
 
+VideoSocket* Server::removeAudioSocket()
+{
+    VideoSocket* socket = m_audioSocket;
+    m_audioSocket = Q_NULLPTR;
+    return socket;
+}
+
 QTcpSocket *Server::getControlSocket()
 {
     return m_controlSocket;
@@ -323,6 +336,9 @@ void Server::stop()
     if (m_controlSocket) {
         m_controlSocket->close();
         m_controlSocket->deleteLater();
+    }
+    if (m_audioSocket) {
+        m_audioSocket->close();
     }
     // ignore failure
     m_serverProcess.kill();
@@ -535,7 +551,8 @@ void Server::onWorkProcessResult(qsc::AdbProcess::ADB_EXEC_RESULT processResult)
                     // client listens and the server connects to the client. That way, the
                     // client can listen before starting the server app, so there is no need to
                     // try to connect until the server socket is listening on the device.
-                    m_serverSocket.setMaxPendingConnections(2);
+                    m_serverSocket.setAudioEnabled(m_params.audio);
+                    m_serverSocket.setMaxPendingConnections(m_params.audio ? 3 : 2);
                     if (!m_serverSocket.listen(QHostAddress::LocalHost, m_params.localPort)) {
                         qCritical() << QString("Could not listen on port %1").arg(m_params.localPort).toStdString().c_str();
                         m_serverStartStep = SSS_NULL;

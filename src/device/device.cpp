@@ -13,6 +13,7 @@
 #include "recorder.h"
 #include "server.h"
 #include "demuxer.h"
+#include "audiodemuxer.h"
 
 namespace qsc {
 
@@ -80,6 +81,7 @@ Device::Device(DeviceParams params, QObject *parent) : IDevice(parent), m_params
     }
 
     m_stream = new Demuxer(this);
+    m_audioStream = new AudioDemuxer(this);
 
     m_server = new Server(this);
     if (m_params.recordFile && !m_params.recordPath.trimmed().isEmpty()) {
@@ -114,6 +116,9 @@ Device::~Device()
     QMutexLocker locker(&m_recorderMutex);
     if (m_lastConfigPacket) {
         av_packet_free(&m_lastConfigPacket);
+    }
+    if (m_lastAudioConfigPacket) {
+        av_packet_free(&m_lastAudioConfigPacket);
     }
 }
 
@@ -228,6 +233,24 @@ bool Device::isReversePort(quint16 port)
 
 void Device::initSignals()
 {
+    if (m_audioStream) {
+        // AudioDemuxer lives in its own thread.  Use a direct callback so the
+        // packet remains valid until it has been copied into the recorder.
+        connect(m_audioStream, &AudioDemuxer::getAudioPacket, this, [this](AVPacket *packet, bool config, AVCodecID codec) {
+            QMutexLocker locker(&m_recorderMutex);
+            m_audioCodec = codec;
+            if (config) {
+                if (m_lastAudioConfigPacket) {
+                    av_packet_free(&m_lastAudioConfigPacket);
+                }
+                m_lastAudioConfigPacket = av_packet_clone(packet);
+            }
+            if (m_recorder && !m_recorder->pushAudio(packet)) {
+                qCritical("Could not send audio packet to recorder");
+            }
+        }, Qt::DirectConnection);
+    }
+
     if (m_controller) {
         connect(m_controller, &Controller::grabCursor, this, [this](bool grab){
             for (const auto& item : m_deviceObservers) {
@@ -292,6 +315,8 @@ void Device::initSignals()
                 m_stream->installVideoSocket(m_server->removeVideoSocket());
                 m_stream->setFrameSize(size);
                 m_stream->startDecode();
+                m_audioStream->installAudioSocket(m_server->removeAudioSocket());
+                m_audioStream->startDecode();
 
                 // recv device msg
                 connect(m_server->getControlSocket(), &QTcpSocket::readyRead, this, [this](){
@@ -430,6 +455,15 @@ bool Device::connectDevice()
         params.logLevel = m_params.logLevel;
         params.codecOptions = m_params.codecOptions;
         params.codecName = m_params.codecName;
+        params.audio = m_params.recordAudio;
+        params.audioCodec = m_params.recordAudioCodec.trimmed().toLower();
+        if (params.audioCodec != "aac") {
+            params.audioCodec = "aac";
+        }
+        params.audioSource = m_params.recordAudioSource.trimmed().toLower();
+        if (params.audioSource != "output") {
+            params.audioSource = "output";
+        }
         params.scid = m_params.scid;
 
         params.crop = m_params.crop;
@@ -458,6 +492,9 @@ void Device::disconnectDevice()
     if (m_stream) {
         m_stream->stopDecode();
     }
+    if (m_audioStream) {
+        m_audioStream->stopDecode();
+    }
 
     // server must stop before decoder, because decoder block main thread
     if (m_decoder) {
@@ -483,8 +520,12 @@ bool Device::startRecording(const QString &fileName, const QString &format)
 {
     QMutexLocker locker(&m_recorderMutex);
     if (fileName.isEmpty() || m_recorder || m_recordFrameSize.isEmpty() || !m_lastConfigPacket) return false;
+    if (m_params.recordAudio && (!m_lastAudioConfigPacket || m_audioCodec != AV_CODEC_ID_AAC)) return false;
     auto *recorder = new Recorder(fileName, this);
     recorder->setFrameSize(m_recordFrameSize);
+    if (m_params.recordAudio) {
+        recorder->setAudio(m_audioCodec, m_lastAudioConfigPacket);
+    }
     recorder->setFormat(format.toLower() == "mkv" ? Recorder::RECORDER_FORMAT_MKV : Recorder::RECORDER_FORMAT_MP4);
     if (!recorder->open() || !recorder->startRecorder()) { recorder->close(); recorder->deleteLater(); return false; }
     m_recorder = recorder;

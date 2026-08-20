@@ -7,9 +7,38 @@
 
 static const AVRational SCRCPY_TIME_BASE = { 1, 1000000 }; // timestamps in us
 
+static void aacStreamParameters(const AVPacket *config, int &sampleRate, int &channels)
+{
+    // Android's scrcpy server sends an AAC AudioSpecificConfig packet before
+    // audio frames.  The MP4 muxer needs these values in addition to the raw
+    // config bytes; leaving them unset corrupts the muxer state on FFmpeg 4.
+    static const int sampleRates[] = {96000, 88200, 64000, 48000, 44100, 32000,
+                                      24000, 22050, 16000, 12000, 11025, 8000,
+                                      7350};
+    sampleRate = 48000;
+    channels = 2;
+    if (!config || config->size < 2) {
+        return;
+    }
+    const quint16 bits = (quint16(config->data[0]) << 8) | config->data[1];
+    const int frequencyIndex = (bits >> 7) & 0x0f;
+    const int channelConfig = (bits >> 3) & 0x0f;
+    if (frequencyIndex >= 0 && frequencyIndex < int(sizeof(sampleRates) / sizeof(sampleRates[0]))) {
+        sampleRate = sampleRates[frequencyIndex];
+    }
+    if (channelConfig > 0 && channelConfig <= 8) {
+        channels = channelConfig;
+    }
+}
+
 Recorder::Recorder(const QString &fileName, QObject *parent) : QThread(parent), m_fileName(fileName), m_format(guessRecordFormat(fileName)) {}
 
-Recorder::~Recorder() {}
+Recorder::~Recorder()
+{
+    if (m_audioConfig) {
+        av_packet_free(&m_audioConfig);
+    }
+}
 
 AVPacket *Recorder::packetNew(const AVPacket *packet)
 {
@@ -46,6 +75,13 @@ void Recorder::setFrameSize(const QSize &declaredFrameSize)
 void Recorder::setFormat(Recorder::RecorderFormat format)
 {
     m_format = format;
+}
+
+void Recorder::setAudio(AVCodecID codec, const AVPacket *config)
+{
+    m_audioCodec = codec;
+    if (m_audioConfig) av_packet_free(&m_audioConfig);
+    m_audioConfig = config ? av_packet_clone(config) : Q_NULLPTR;
 }
 
 bool Recorder::open()
@@ -102,6 +138,44 @@ bool Recorder::open()
     outStream->codec->height = m_declaredFrameSize.height();
 #endif
 
+    if (m_audioCodec != AV_CODEC_ID_NONE) {
+        AVStream *audioStream = avformat_new_stream(m_formatCtx, avcodec_find_decoder(m_audioCodec));
+        if (!audioStream) { avformat_free_context(m_formatCtx); m_formatCtx = Q_NULLPTR; return false; }
+        audioStream->time_base = SCRCPY_TIME_BASE;
+        int sampleRate = 48000;
+        int channels = 2;
+        if (m_audioCodec == AV_CODEC_ID_AAC) {
+            aacStreamParameters(m_audioConfig, sampleRate, channels);
+        }
+#ifdef QTSCRCPY_LAVF_HAS_NEW_CODEC_PARAMS_API
+        audioStream->codecpar->codec_type = AVMEDIA_TYPE_AUDIO;
+        audioStream->codecpar->codec_id = m_audioCodec;
+        audioStream->codecpar->sample_rate = sampleRate;
+        audioStream->codecpar->channels = channels;
+        audioStream->codecpar->channel_layout = av_get_default_channel_layout(channels);
+        audioStream->codecpar->format = AV_SAMPLE_FMT_FLTP;
+        if (m_audioConfig) {
+            audioStream->codecpar->extradata = (quint8 *)av_mallocz(m_audioConfig->size + AV_INPUT_BUFFER_PADDING_SIZE);
+            if (!audioStream->codecpar->extradata) { avformat_free_context(m_formatCtx); m_formatCtx = Q_NULLPTR; return false; }
+            memcpy(audioStream->codecpar->extradata, m_audioConfig->data, m_audioConfig->size);
+            audioStream->codecpar->extradata_size = m_audioConfig->size;
+        }
+#else
+        audioStream->codec->codec_type = AVMEDIA_TYPE_AUDIO;
+        audioStream->codec->codec_id = m_audioCodec;
+        audioStream->codec->sample_rate = sampleRate;
+        audioStream->codec->channels = channels;
+        audioStream->codec->channel_layout = av_get_default_channel_layout(channels);
+        audioStream->codec->sample_fmt = AV_SAMPLE_FMT_FLTP;
+        if (m_audioConfig) {
+            audioStream->codec->extradata = (quint8 *)av_mallocz(m_audioConfig->size + AV_INPUT_BUFFER_PADDING_SIZE);
+            if (!audioStream->codec->extradata) { avformat_free_context(m_formatCtx); m_formatCtx = Q_NULLPTR; return false; }
+            memcpy(audioStream->codec->extradata, m_audioConfig->data, m_audioConfig->size);
+            audioStream->codec->extradata_size = m_audioConfig->size;
+        }
+#endif
+    }
+
     int ret = avio_open(&m_formatCtx->pb, m_fileName.toUtf8().toStdString().c_str(), AVIO_FLAG_WRITE);
     if (ret < 0) {
         char errorbuf[255] = { 0 };
@@ -140,6 +214,7 @@ void Recorder::close()
 bool Recorder::write(AVPacket *packet)
 {
     if (!m_headerWritten) {
+        if (packet->stream_index == 1) return true;
         if (packet->pts != AV_NOPTS_VALUE) {
             qCritical("The first packet is not a config packet");
             return false;
@@ -158,7 +233,7 @@ bool Recorder::write(AVPacket *packet)
     }
 
     recorderRescalePacket(packet);
-    return av_write_frame(m_formatCtx, packet) >= 0;
+    return av_interleaved_write_frame(m_formatCtx, packet) >= 0;
 }
 
 const AVOutputFormat *Recorder::findMuxer(const char *name)
@@ -207,7 +282,7 @@ bool Recorder::recorderWriteHeader(const AVPacket *packet)
 
 void Recorder::recorderRescalePacket(AVPacket *packet)
 {
-    AVStream *ostream = m_formatCtx->streams[0];
+    AVStream *ostream = m_formatCtx->streams[packet->stream_index == 1 ? 1 : 0];
     av_packet_rescale_ts(packet, SCRCPY_TIME_BASE, ostream->time_base);
 }
 
@@ -276,6 +351,15 @@ void Recorder::run()
         }
 
         // recorder->previous is only written from this thread, no need to lock
+        if (rec->stream_index == 1) {
+            if (rec->pts != AV_NOPTS_VALUE) {
+                if (m_audioPtsOrigin == AV_NOPTS_VALUE) m_audioPtsOrigin = rec->pts;
+                rec->pts -= m_audioPtsOrigin; rec->dts = rec->pts;
+                if (!write(rec)) { packetDelete(rec); break; }
+            }
+            packetDelete(rec);
+            continue;
+        }
         AVPacket *previous = m_previous;
         m_previous = rec;
 
@@ -338,8 +422,18 @@ bool Recorder::push(const AVPacket *packet)
 
     AVPacket *rec = packetNew(packet);
     if (rec) {
+        rec->stream_index = 0;
         m_queue.enqueue(rec);
         m_recvDataCond.wakeOne();
     }
+    return rec != Q_NULLPTR;
+}
+
+bool Recorder::pushAudio(const AVPacket *packet)
+{
+    QMutexLocker locker(&m_mutex);
+    if (m_stopped || m_failed) return false;
+    AVPacket *rec = packetNew(packet);
+    if (rec) { rec->stream_index = 1; m_queue.enqueue(rec); m_recvDataCond.wakeOne(); }
     return rec != Q_NULLPTR;
 }

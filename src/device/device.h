@@ -7,6 +7,10 @@
 #include <QPointer>
 #include <QTime>
 
+extern "C" {
+#include "libavcodec/avcodec.h"
+}
+
 #include "../../include/QtScrcpyCore.h"
 
 class QMouseEvent;
@@ -18,6 +22,7 @@ class VideoBuffer;
 class IDecoder;
 class FileHandler;
 class Demuxer;
+class AudioDemuxer;
 class VideoForm;
 class Controller;
 struct AVFrame;
@@ -98,12 +103,15 @@ private:
     QPointer<Controller> m_controller;
     QPointer<FileHandler> m_fileHandler;
     QPointer<Demuxer> m_stream;
+    QPointer<AudioDemuxer> m_audioStream;
     QPointer<Recorder> m_recorder;
     // getFrame/getConfigFrame run in the demuxer thread, while the IMM UI/API
     // starts and stops a recorder in the GUI thread.  Keep the hand-off
     // serialized so a packet cannot be queued after stopRecorder().
     QMutex m_recorderMutex;
     AVPacket* m_lastConfigPacket = Q_NULLPTR;
+    AVPacket* m_lastAudioConfigPacket = Q_NULLPTR;
+    AVCodecID m_audioCodec = AV_CODEC_ID_NONE;
     QSize m_recordFrameSize;
 
     QElapsedTimer m_startTimeCount;

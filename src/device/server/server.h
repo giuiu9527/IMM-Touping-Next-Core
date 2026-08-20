@@ -63,6 +63,9 @@ public:
         QString displayImePolicy = "";
         bool keepActive = false;
         bool control = true;           // 安卓端是否接收键鼠控制
+        bool audio = false;
+        QString audioCodec = "aac";
+        QString audioSource = "playback";
         qint32 scid = -1;             // 随机数，作为localsocket名字后缀，方便同时连接同一个设备多次
     };
 
@@ -74,6 +77,7 @@ public:
     bool isReverse();
     Server::ServerParams getParams();
     VideoSocket *removeVideoSocket();
+    VideoSocket *removeAudioSocket();
     QTcpSocket *getControlSocket();
 
 signals:
@@ -107,6 +111,7 @@ private:
     qsc::AdbProcess m_serverProcess;
     TcpServer m_serverSocket; // only used if !tunnel_forward
     QPointer<VideoSocket> m_videoSocket = Q_NULLPTR;
+    QPointer<VideoSocket> m_audioSocket = Q_NULLPTR;
     QPointer<QTcpSocket> m_controlSocket = Q_NULLPTR;
     bool m_tunnelEnabled = false;
     bool m_tunnelForward = false; // use "adb forward" instead of "adb reverse"
