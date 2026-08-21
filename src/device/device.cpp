@@ -957,4 +957,11 @@ bool Device::saveFrame(int width, int height, uint8_t* dataRGB32)
     return true;
 }
 
+void Device::requestVideoReset()
+{
+    if (m_controller) {
+        m_controller->postControlMsg(new ControlMsg(ControlMsg::CMT_RESET_VIDEO));
+    }
+}
+
 }

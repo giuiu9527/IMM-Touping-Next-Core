@@ -1,4 +1,4 @@
-﻿#ifndef DEVICE_H
+#ifndef DEVICE_H
 #define DEVICE_H
 
 #include <set>
@@ -78,6 +78,7 @@ public:
     void stopRecording() override;
 
     void screenshot() override;
+    void requestVideoReset() override;
     void showTouch(bool show) override;
     void setCameraTorch(bool on) override;
     void cameraZoomIn() override;

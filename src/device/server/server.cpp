@@ -390,7 +390,7 @@ bool Server::readInfo(VideoSocket *videoSocket, QString &deviceName, QSize &size
     timer.start();
     unsigned char buf[DEVICE_NAME_FIELD_LENGTH + VIDEO_META_LENGTH];
     while (videoSocket->bytesAvailable() < (DEVICE_NAME_FIELD_LENGTH + VIDEO_META_LENGTH)) {
-        videoSocket->waitForReadyRead(300);
+        videoSocket->waitForReadyRead(100);
         if (timer.elapsed() > 3000) {
             qInfo("readInfo timeout");
             return false;
@@ -430,7 +430,7 @@ void Server::stopAcceptTimeoutTimer()
 void Server::startConnectTimeoutTimer()
 {
     stopConnectTimeoutTimer();
-    m_connectTimeoutTimer = startTimer(300);
+    m_connectTimeoutTimer = startTimer(150);
 }
 
 void Server::stopConnectTimeoutTimer()
@@ -455,7 +455,7 @@ void Server::onConnectTimer()
     QTcpSocket *controlSocket = new QTcpSocket();
 
     videoSocket->connectToHost(QHostAddress::LocalHost, m_params.localPort);
-    if (!videoSocket->waitForConnected(1000)) {
+    if (!videoSocket->waitForConnected(500)) {
         // 连接到adb很快的，这里失败不重试
         m_connectCount = MAX_CONNECT_COUNT;
         qWarning("video socket connect to server failed");
@@ -463,7 +463,7 @@ void Server::onConnectTimer()
     }
 
     controlSocket->connectToHost(QHostAddress::LocalHost, m_params.localPort);
-    if (!controlSocket->waitForConnected(1000)) {
+    if (!controlSocket->waitForConnected(500)) {
         // 连接到adb很快的，这里失败不重试
         m_connectCount = MAX_CONNECT_COUNT;
         qWarning("control socket connect to server failed");
@@ -473,7 +473,7 @@ void Server::onConnectTimer()
     if (QTcpSocket::ConnectedState == videoSocket->state()) {
         // connect will success even if devices offline, recv data is real connect success
         // because connect is to pc adb server
-        videoSocket->waitForReadyRead(1000);
+        videoSocket->waitForReadyRead(500);
         // devices will send 1 byte first on tunnel forward mode
         QByteArray data = videoSocket->read(1);
         if (!data.isEmpty() && readInfo(videoSocket, deviceName, deviceSize)) {

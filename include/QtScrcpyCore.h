@@ -137,6 +137,7 @@ public:
     virtual void stopRecording() {}
 
     virtual void screenshot() = 0;
+    virtual void requestVideoReset() = 0;
     virtual void showTouch(bool show) = 0;
     virtual void setCameraTorch(bool on) { Q_UNUSED(on); }
     virtual void cameraZoomIn() {}
