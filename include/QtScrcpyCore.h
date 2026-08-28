@@ -137,6 +137,10 @@ public:
     virtual void stopRecording() {}
 
     virtual void screenshot() = 0;
+    // Same as screenshot(), but saves into saveDir instead of the device's
+    // configured recordPath. Default just falls back to screenshot() so any
+    // other IDevice implementer keeps working unchanged.
+    virtual void screenshot(const QString &saveDir) { Q_UNUSED(saveDir); screenshot(); }
     virtual void requestVideoReset() = 0;
     virtual void showTouch(bool show) = 0;
     virtual void setCameraTorch(bool on) { Q_UNUSED(on); }

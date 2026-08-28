@@ -169,13 +169,18 @@ void Device::updateScript(QString script)
 
 void Device::screenshot()
 {
+    screenshot(QString());
+}
+
+void Device::screenshot(const QString &saveDir)
+{
     if (!m_decoder) {
         return;
     }
 
     // screenshot
-    m_decoder->peekFrame([this](int width, int height, uint8_t* dataRGB32) {
-       saveFrame(width, height, dataRGB32);
+    m_decoder->peekFrame([this, saveDir](int width, int height, uint8_t* dataRGB32) {
+       saveFrame(width, height, dataRGB32, saveDir);
     });
 }
 
@@ -925,7 +930,7 @@ bool Device::isCurrentCustomKeymap()
     return m_controller->isCurrentCustomKeymap();
 }
 
-bool Device::saveFrame(int width, int height, uint8_t* dataRGB32)
+bool Device::saveFrame(int width, int height, uint8_t* dataRGB32, const QString &saveDir)
 {
     if (!dataRGB32) {
         return false;
@@ -935,7 +940,7 @@ bool Device::saveFrame(int width, int height, uint8_t* dataRGB32)
 
     // save
     QString absFilePath;
-    QString fileDir(m_params.recordPath);
+    QString fileDir(saveDir.isEmpty() ? m_params.recordPath : saveDir);
     if (fileDir.isEmpty()) {
         qWarning() << "please select record save path!!!";
         return false;

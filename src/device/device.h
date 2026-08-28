@@ -78,6 +78,7 @@ public:
     void stopRecording() override;
 
     void screenshot() override;
+    void screenshot(const QString &saveDir) override;
     void requestVideoReset() override;
     void showTouch(bool show) override;
     void setCameraTorch(bool on) override;
@@ -94,7 +95,7 @@ public:
 
 private:
     void initSignals();
-    bool saveFrame(int width, int height, uint8_t* dataRGB32);
+    bool saveFrame(int width, int height, uint8_t* dataRGB32, const QString &saveDir = QString());
 
 private:
     // server relevant
