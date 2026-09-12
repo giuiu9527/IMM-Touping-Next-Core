@@ -829,6 +829,21 @@ void Device::setDeviceClipboard(bool pause)
     }
 }
 
+void Device::setDeviceClipboardText(const QString &text, bool paste)
+{
+    if (isCameraMode()) {
+        return;
+    }
+    if (!m_controller) {
+        return;
+    }
+    m_controller->setDeviceClipboardText(text, paste);
+
+    for (const auto& item : m_deviceObservers) {
+        item->setDeviceClipboardText(text, paste);
+    }
+}
+
 void Device::clipboardPaste()
 {
     if (isCameraMode()) {

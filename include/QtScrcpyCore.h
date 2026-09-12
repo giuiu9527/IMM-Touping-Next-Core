@@ -77,6 +77,7 @@ public:
     virtual void postTextInput(QString &text) { Q_UNUSED(text); }
     virtual void requestDeviceClipboard() {}
     virtual void setDeviceClipboard(bool pause = true) { Q_UNUSED(pause); }
+    virtual void setDeviceClipboardText(const QString &text, bool paste = true) { Q_UNUSED(text); Q_UNUSED(paste); }
     virtual void clipboardPaste() {}
     virtual void pushFileRequest(const QString &file, const QString &devicePath) {
         Q_UNUSED(file);
@@ -130,6 +131,11 @@ public:
     virtual void postTextInput(QString &text) = 0;
     virtual void requestDeviceClipboard() = 0;
     virtual void setDeviceClipboard(bool pause = true) = 0;
+    // Push an explicit string to the device clipboard (without touching the
+    // PC clipboard) and, with paste=true, paste it into the focused field.
+    // This is how non-ASCII text (IME input) reaches the phone: scrcpy's
+    // INJECT_TEXT only handles characters KeyCharacterMap can type.
+    virtual void setDeviceClipboardText(const QString &text, bool paste = true) = 0;
     virtual void clipboardPaste() = 0;
     virtual void pushFileRequest(const QString &file, const QString &devicePath = "") = 0;
     virtual void installApkRequest(const QString &apkFile) = 0;

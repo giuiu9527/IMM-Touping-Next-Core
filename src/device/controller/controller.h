@@ -59,6 +59,7 @@ public:
     void requestDeviceClipboard();
     void getDeviceClipboard(bool cut = false);
     void setDeviceClipboard(bool pause = true);
+    void setDeviceClipboardText(const QString &text, bool paste = true);
     void clipboardPaste();
     void postTextInput(QString &text);
 

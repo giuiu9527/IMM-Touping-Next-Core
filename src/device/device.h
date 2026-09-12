@@ -71,6 +71,7 @@ public:
     void postTextInput(QString &text) override;
     void requestDeviceClipboard() override;
     void setDeviceClipboard(bool pause = true) override;
+    void setDeviceClipboardText(const QString &text, bool paste = true) override;
     void clipboardPaste() override;
     void pushFileRequest(const QString &file, const QString &devicePath = "") override;
     void installApkRequest(const QString &apkFile) override;

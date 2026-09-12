@@ -69,26 +69,33 @@ bool DeviceManage::connectDevice(qsc::DeviceParams params)
     return true;
 }
 
+// Explicit disconnects must drop the map entry themselves. Device's
+// destructor only emits deviceDisconnected (which is what used to remove the
+// entry) when the server had fully started -- so disconnecting a device that
+// was still *connecting* (queue timeout, unplug during start-up, 停止全部
+// mid-connect) left a dangling key behind, and connectDevice() then refused
+// that serial forever with "already connected". That was the "phone dropped
+// once, can never reconnect until restart" bug.
 bool DeviceManage::disconnectDevice(const QString &serial)
 {
-    bool ret = false;
-    if (!serial.isEmpty() && m_devices.contains(serial)) {
-        auto it = m_devices.find(serial);
-        if (it->data()) {
-            delete it->data();
-            ret = true;
-        }
+    if (serial.isEmpty() || !m_devices.contains(serial)) {
+        return false;
     }
-    return ret;
+    QPointer<IDevice> device = m_devices.take(serial);
+    if (!device) {
+        return false;
+    }
+    delete device;
+    return true;
 }
 
 void DeviceManage::disconnectAllDevice()
 {
-    QMapIterator<QString, QPointer<IDevice>> i(m_devices);
-    while (i.hasNext()) {
-        i.next();
-        if (i.value()) {
-            delete i.value();
+    const QMap<QString, QPointer<IDevice>> devices = m_devices;
+    m_devices.clear();
+    for (auto it = devices.cbegin(); it != devices.cend(); ++it) {
+        if (it.value()) {
+            delete it.value();
         }
     }
 }
@@ -131,9 +138,12 @@ quint16 DeviceManage::getFreePort()
 
 void DeviceManage::removeDevice(const QString &serial)
 {
-    if (!serial.isEmpty() && m_devices.contains(serial)) {
-        m_devices[serial]->deleteLater();
-        m_devices.remove(serial);
+    if (serial.isEmpty() || !m_devices.contains(serial)) {
+        return;
+    }
+    QPointer<IDevice> device = m_devices.take(serial);
+    if (device) {
+        device->deleteLater();
     }
 }
 
