@@ -236,6 +236,12 @@ bool Recorder::write(AVPacket *packet)
         return true;
     }
 
+    // An audio packet for a muxer that only has a video stream must be
+    // dropped, not indexed: streams[1] would read past the array.
+    if (packet->stream_index >= static_cast<int>(m_formatCtx->nb_streams)) {
+        return true;
+    }
+
     recorderRescalePacket(packet);
     return av_interleaved_write_frame(m_formatCtx, packet) >= 0;
 }
