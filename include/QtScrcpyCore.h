@@ -147,6 +147,8 @@ public:
     // configured recordPath. Default just falls back to screenshot() so any
     // other IDevice implementer keeps working unchanged.
     virtual void screenshot(const QString &saveDir) { Q_UNUSED(saveDir); screenshot(); }
+    // Same, cropping cropTop / cropBottom frame rows (e.g. the status bar).
+    virtual void screenshot(const QString &saveDir, int cropTop, int cropBottom) { Q_UNUSED(cropTop); Q_UNUSED(cropBottom); screenshot(saveDir); }
     virtual void requestVideoReset() = 0;
     virtual void showTouch(bool show) = 0;
     virtual void setCameraTorch(bool on) { Q_UNUSED(on); }

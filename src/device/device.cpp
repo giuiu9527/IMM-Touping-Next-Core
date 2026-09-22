@@ -174,13 +174,18 @@ void Device::screenshot()
 
 void Device::screenshot(const QString &saveDir)
 {
+    screenshot(saveDir, 0, 0);
+}
+
+void Device::screenshot(const QString &saveDir, int cropTop, int cropBottom)
+{
     if (!m_decoder) {
         return;
     }
 
     // screenshot
-    m_decoder->peekFrame([this, saveDir](int width, int height, uint8_t* dataRGB32) {
-       saveFrame(width, height, dataRGB32, saveDir);
+    m_decoder->peekFrame([this, saveDir, cropTop, cropBottom](int width, int height, uint8_t* dataRGB32) {
+       saveFrame(width, height, dataRGB32, saveDir, cropTop, cropBottom);
     });
 }
 
@@ -945,13 +950,18 @@ bool Device::isCurrentCustomKeymap()
     return m_controller->isCurrentCustomKeymap();
 }
 
-bool Device::saveFrame(int width, int height, uint8_t* dataRGB32, const QString &saveDir)
+bool Device::saveFrame(int width, int height, uint8_t* dataRGB32, const QString &saveDir, int cropTop, int cropBottom)
 {
     if (!dataRGB32) {
         return false;
     }
 
     QImage rgbImage(dataRGB32, width, height, QImage::Format_RGB32);
+    // Trim the status / navigation bar rows if asked and the numbers are sane.
+    cropTop = qMax(0, cropTop); cropBottom = qMax(0, cropBottom);
+    if ((cropTop || cropBottom) && cropTop + cropBottom < height) {
+        rgbImage = rgbImage.copy(0, cropTop, width, height - cropTop - cropBottom);
+    }
 
     // save
     QString absFilePath;
